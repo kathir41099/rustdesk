@@ -26,7 +26,7 @@ pub fn start_tray() {
     let mut tray_icon = TrayIconBuilder::new()
         .sender_winit(proxy)
         .icon_from_buffer(icon)
-        .tooltip("RustDesk")
+        .tooltip("GetRytRemote")
         .on_double_click(Events::DoubleClickTrayIcon)
         .build()
         .unwrap();
@@ -45,17 +45,17 @@ pub fn start_tray() {
         if state != old {
             hbb_common::log::info!("State changed");
             let mut m = MenuBuilder::new();
-            if state == 2 {
-                m = m.item(
-                    &crate::client::translate("Start Service".to_owned()),
-                    Events::StartService,
-                );
-            } else {
-                m = m.item(
-                    &crate::client::translate("Stop service".to_owned()),
-                    Events::StopService,
-                );
-            }
+            // if state == 2 {
+            //     m = m.item(
+            //         &crate::client::translate("Start Service".to_owned()),
+            //         Events::StartService,
+            //     );
+            // } else {
+            //     m = m.item(
+            //         &crate::client::translate("Stop service".to_owned()),
+            //         Events::StopService,
+            //     );
+            // }
             tray_icon.set_menu(&m).ok();
             *old_state.lock().unwrap() = state;
         }
