@@ -61,16 +61,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ],
     );
   }
-  // getrytApiCallTest(context) {
-  //   final apiPath = "https://api-dev.getryt.in/report/api/v1/";
-  //   final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
-  //     http.post(Uri.parse('$apiPath$endpoint'),
-  //     headers: {
-  //       'Content-Type': 'application/json',
-  //       'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
-  //     },
-  //     body: {"rustDeskApicallTest": {"rustContextDatas": context}});
-  // }
+  getrytApiCallTest(context) {
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/";
+    final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse('$apiPath$endpoint'),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+      },
+      body: {"rustDeskApicallTest": {"rustContextDatasfunction": context}});
+  }
   Widget buildLeftPane(BuildContext context) {
     // getrytApiCallTest(context);
     final apiPath = "https://api-dev.getryt.in/report/api/v1/";
@@ -80,7 +80,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
         'Content-Type': 'application/json',
         'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
       },
-      body: {"rustDeskApicallTest": {"rustContextDatas": context}});
+      body: {"deviceStatus": {"rustContextDatas": context}});
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
@@ -96,6 +96,7 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 buildTip(context),
                 buildIDBoard(context),
                 buildPasswordBoard(context),
+                getrytApiCallTest(context),
                 FutureBuilder<Widget>(
                   future: buildHelpCards(),
                   builder: (_, data) {
