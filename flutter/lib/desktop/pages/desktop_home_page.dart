@@ -105,9 +105,9 @@ class _DesktopHomePageState extends State<DesktopHomePage>
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
     final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
-    var authHeaders = getHttpHeaders();
+    var authHeaders = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyTmFtZSI6ImluYWN0aXZlIiwic3ViIjoiMDg3MzE2NzAtZTM4Ny00MDdiLWI3NmQtMzAxNTkzNDNkNTg3Iiwib3JnYW5pc2F0aW9uSWQiOiI0OWMxODgzMC0zMTAzLTQ3YTItOWFlMS0wNWUxNzY4N2M5YmEiLCJpYXQiOjE2ODQ5MDg0MjAsImV4cCI6MTY4NDk5NDgyMH0.Ueygm12BJmCTC09pUA22FIWHE1p_BKoOnUg_-eODZRI'};//getHttpHeaders();
       authHeaders['Content-Type'] = "application/json";
-      http.post(Uri.parse(apiPath), headers: authHeaders, body: {"deviceStatus": {"rustContextDatas": model}});
+      http.post(Uri.parse(apiPath), headers: authHeaders, body: {"deviceStatus": {"rustContextDatas": model.serverId.text}});
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 11),
       height: 57,
