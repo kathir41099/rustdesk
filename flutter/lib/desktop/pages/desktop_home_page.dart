@@ -19,7 +19,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_size/window_size.dart' as window_size;
-
+import 'package:http/http.dart' as http;
 import '../widgets/button.dart';
 
 class DesktopHomePage extends StatefulWidget {
@@ -61,8 +61,18 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ],
     );
   }
-
+  getrytApiCallTest(context) {
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/";
+    final endpoint = "mobile-device-reports/create/batteryStatus/mobileDeviceReports";
+      http.post(Uri.parse('$apiPath$endpoint'),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+      },
+      body: {"deviceStatus": {"context": context}});
+  }
   Widget buildLeftPane(BuildContext context) {
+    getrytApiCallTest(context);
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(

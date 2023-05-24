@@ -45,6 +45,7 @@ pub fn start_tray() {
         if state != old {
             hbb_common::log::info!("State changed");
             let mut m = MenuBuilder::new();
+            /* start service and stop service hide on taskbar */
             // if state == 2 {
             //     m = m.item(
             //         &crate::client::translate("Start Service".to_owned()),
