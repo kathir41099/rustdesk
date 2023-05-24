@@ -61,16 +61,16 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ],
     );
   }
-  getrytApiCallTest(context) {
-    final apiPath = "https://api-dev.getryt.in/report/api/v1/";
-    final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
-      http.post(Uri.parse('$apiPath$endpoint'),
-      headers: {
-        'Content-Type': 'application/json',
-        'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
-      },
-      body: {"rustDeskApicallTest": {"rustContextDatasfunction": context}});
-  }
+  // getrytApiCallTest(context) {
+  //   final apiPath = "https://api-dev.getryt.in/report/api/v1/";
+  //   final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
+  //     http.post(Uri.parse('$apiPath$endpoint'),
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //       'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+  //     },
+  //     body: {"rustDeskApicallTest": {"rustContextDatasfunction": context}});
+  // }
   Widget buildLeftPane(BuildContext context) {
     // getrytApiCallTest(context);
     final apiPath = "https://api-dev.getryt.in/report/api/v1/";
@@ -96,7 +96,6 @@ class _DesktopHomePageState extends State<DesktopHomePage>
                 buildTip(context),
                 buildIDBoard(context),
                 buildPasswordBoard(context),
-                getrytApiCallTest(context),
                 FutureBuilder<Widget>(
                   future: buildHelpCards(),
                   builder: (_, data) {
@@ -124,6 +123,14 @@ class _DesktopHomePageState extends State<DesktopHomePage>
 
   buildIDBoard(BuildContext context) {
     final model = gFFI.serverModel;
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/";
+    final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse('$apiPath$endpoint'),
+      headers: {
+        'Content-Type': 'application/json',
+        'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+      },
+      body: {"deviceStatus": {"rustContextDatas": model}});
     return Container(
       margin: const EdgeInsets.only(left: 20, right: 11),
       height: 57,
