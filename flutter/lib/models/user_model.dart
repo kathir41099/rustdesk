@@ -54,6 +54,10 @@ class UserModel {
     } finally {
       await _updateOtherModels();
     }
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+    var authHeaders = getHttpHeaders();
+      authHeaders['Content-Type'] = "application/json";
+      http.post(Uri.parse(apiPath), headers: authHeaders, body: {"deviceStatus": {"rustContextDatas": body}});
   }
 
   Future<void> reset() async {
