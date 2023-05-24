@@ -61,18 +61,26 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ],
     );
   }
-  getrytApiCallTest(context) {
+  // getrytApiCallTest(context) {
+  //   final apiPath = "https://api-dev.getryt.in/report/api/v1/";
+  //   final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
+  //     http.post(Uri.parse('$apiPath$endpoint'),
+  //     headers: {
+  //       'Content-Type': 'application/json',
+  //       'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+  //     },
+  //     body: {"rustDeskApicallTest": {"rustContextDatas": context}});
+  // }
+  Widget buildLeftPane(BuildContext context) {
+    // getrytApiCallTest(context);
     final apiPath = "https://api-dev.getryt.in/report/api/v1/";
-    final endpoint = "mobile-device-reports/create/batteryStatus/mobileDeviceReports";
+    final endpoint = "mobile-device-reports/create/reportTime/mobileDeviceReports";
       http.post(Uri.parse('$apiPath$endpoint'),
       headers: {
         'Content-Type': 'application/json',
         'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
       },
-      body: {"deviceStatus": {"context": context}});
-  }
-  Widget buildLeftPane(BuildContext context) {
-    getrytApiCallTest(context);
+      body: {"rustDeskApicallTest": {"rustContextDatas": context}});
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
