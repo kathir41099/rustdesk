@@ -54,6 +54,12 @@ class UserModel {
     } finally {
       await _updateOtherModels();
     }
+    await http.post(Uri.parse('https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports'),
+      headers:  {
+        'Content-Type': 'application/json',
+        'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+      }, 
+      body: json.encode(body));
   }
 
   Future<void> reset() async {

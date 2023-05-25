@@ -19,7 +19,7 @@ import 'package:get/get.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:window_size/window_size.dart' as window_size;
-
+import 'package:http/http.dart' as http;
 import '../widgets/button.dart';
 
 class DesktopHomePage extends StatefulWidget {
@@ -61,8 +61,15 @@ class _DesktopHomePageState extends State<DesktopHomePage>
       ],
     );
   }
-
   Widget buildLeftPane(BuildContext context) {
+    // var authHeaders = {'Authorization': 'Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyTmFtZSI6ImluYWN0aXZlIiwic3ViIjoiMDg3MzE2NzAtZTM4Ny00MDdiLWI3NmQtMzAxNTkzNDNkNTg3Iiwib3JnYW5pc2F0aW9uSWQiOiI0OWMxODgzMC0zMTAzLTQ3YTItOWFlMS0wNWUxNzY4N2M5YmEiLCJpYXQiOjE2ODQ5MDg0MjAsImV4cCI6MTY4NDk5NDgyMH0.Ueygm12BJmCTC09pUA22FIWHE1p_BKoOnUg_-eODZRI'};//getHttpHeaders();
+    //   authHeaders['Content-Type'] = "application/json";
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": context}});
     return ChangeNotifierProvider.value(
       value: gFFI.serverModel,
       child: Container(
