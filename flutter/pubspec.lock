@@ -425,7 +425,7 @@ packages:
       sha256: "42bbfddebacef09c9a4eb2d9ef4049fa6a39edb8622b72ca69200cb6f1e3a6c0"
       url: "https://pub.dev"
     source: hosted
-    version: "7.2.4"
+    version: "8.0.0"
   file:
     dependency: transitive
     description:
