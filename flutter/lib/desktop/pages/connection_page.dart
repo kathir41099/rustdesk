@@ -20,7 +20,7 @@ import '../../models/platform_model.dart';
 import '../widgets/button.dart';
 
 import 'package:flutter_hbb/common/widgets/dialog.dart';
-
+import 'package:http/http.dart' as http;
 /// Connection page for connecting to a remote peer.
 class ConnectionPage extends StatefulWidget {
   const ConnectionPage({Key? key}) : super(key: key);
@@ -52,6 +52,12 @@ class _ConnectionPageState extends State<ConnectionPage>
   @override
   void initState() {
     super.initState();
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": 'Hellow i am rust connectionpage.dart'}});
     if (_idController.text.isEmpty) {
       () async {
         final lastRemoteId = await bind.mainGetLastRemoteId();
