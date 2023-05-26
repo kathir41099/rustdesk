@@ -55,7 +55,8 @@ use windows_service::{
 };
 use winreg::enums::*;
 use winreg::RegKey;
-use reqwest::{Client, Error};
+use std::collections::HashMap;
+use reqwest::{ Error, Client};
 pub fn get_cursor_pos() -> Option<(i32, i32)> {
     unsafe {
         #[allow(invalid_value)]
@@ -991,12 +992,14 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     // let apiPostData = {
     //     'deviceStatus': deviceStatus
     // }
-    let student = new Map();  
-    student['deviceStatus'] = 'Tom';
+    let url = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports"
+    // student['deviceStatus'] = 'Tom';
+    // let student = new Map();  
+    // let json_data = r#"{"deviceStatus": "John Doe"}"#;
     let client = reqwest::Client::new();
-    let res = client.post("https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports")
+    let res = client.post(url)
         .header("Content-Type", "application/json")
-        .body(student.to_owned())
+        .body("json_data")
         .send()
         .await?;
     let uninstall_str = get_uninstall(false);
