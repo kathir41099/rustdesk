@@ -109,7 +109,7 @@ impl SharedMemory {
 
     pub fn write(&self, addr: usize, data: &[u8]) {
         unsafe {
-            assert!(addr + data.len() <= self.inner.len());
+            debug_assert!(addr + data.len() <= self.inner.len());
             let ptr = self.inner.as_ptr().add(addr);
             let shared_mem_slice = slice::from_raw_parts_mut(ptr, data.len());
             shared_mem_slice.copy_from_slice(data);
@@ -245,9 +245,18 @@ pub mod server {
         threads.push(std::thread::spawn(|| {
             run_exit_check();
         }));
+        let record_pos_handle = crate::input_service::try_start_record_cursor_pos();
         for th in threads.drain(..) {
             th.join().unwrap();
             log::info!("thread joined");
+        }
+
+        crate::input_service::try_stop_record_cursor_pos();
+        if let Some(handle) = record_pos_handle {
+            match handle.join() {
+                Ok(_) => log::info!("record_pos_handle joined"),
+                Err(e) => log::error!("record_pos_handle join error {:?}", &e),
+            }
         }
     }
 
@@ -452,9 +461,9 @@ pub mod server {
                                             break;
                                         }
                                     }
-                                    Mouse(v) => {
+                                    Mouse((v, conn)) => {
                                         if let Ok(evt) = MouseEvent::parse_from_bytes(&v) {
-                                            crate::input_service::handle_mouse_(&evt);
+                                            crate::input_service::handle_mouse_(&evt, conn);
                                         }
                                     }
                                     Key(v) => {
@@ -847,10 +856,12 @@ pub mod client {
         }
     }
 
-    fn handle_mouse_(evt: &MouseEvent) -> ResultType<()> {
+    fn handle_mouse_(evt: &MouseEvent, conn: i32) -> ResultType<()> {
         let mut v = vec![];
         evt.write_to_vec(&mut v)?;
-        ipc_send(Data::DataPortableService(DataPortableService::Mouse(v)))
+        ipc_send(Data::DataPortableService(DataPortableService::Mouse((
+            v, conn,
+        ))))
     }
 
     fn handle_key_(evt: &KeyEvent) -> ResultType<()> {
@@ -890,11 +901,12 @@ pub mod client {
         }
     }
 
-    pub fn handle_mouse(evt: &MouseEvent) {
+    pub fn handle_mouse(evt: &MouseEvent, conn: i32) {
         if RUNNING.lock().unwrap().clone() {
-            handle_mouse_(evt).ok();
+            crate::input_service::update_latest_input_cursor_time(conn);
+            handle_mouse_(evt, conn).ok();
         } else {
-            crate::input_service::handle_mouse_(evt);
+            crate::input_service::handle_mouse_(evt, conn);
         }
     }
 

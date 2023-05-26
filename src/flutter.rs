@@ -108,7 +108,7 @@ fn rust_args_to_c_args(args: Vec<String>, outlen: *mut c_int) -> *mut *mut c_cha
 
     // Make sure we're not wasting space.
     out.shrink_to_fit();
-    assert!(out.len() == out.capacity());
+    debug_assert!(out.len() == out.capacity());
 
     // Get the pointer to our vector.
     let len = out.len();
@@ -257,7 +257,7 @@ impl FlutterHandler {
     /// * `event` - Fields of the event content.
     pub fn push_event(&self, name: &str, event: Vec<(&str, &str)>) -> Option<bool> {
         let mut h: HashMap<&str, &str> = event.iter().cloned().collect();
-        assert!(h.get("name").is_none());
+        debug_assert!(h.get("name").is_none());
         h.insert("name", name);
         let out = serde_json::ser::to_string(&h).unwrap_or("".to_owned());
         Some(
@@ -286,6 +286,8 @@ impl FlutterHandler {
             h.insert("width", d.width);
             h.insert("height", d.height);
             h.insert("cursor_embedded", if d.cursor_embedded { 1 } else { 0 });
+            h.insert("original_width", d.original_resolution.width);
+            h.insert("original_height", d.original_resolution.height);
             msg_vec.push(h);
         }
         serde_json::ser::to_string(&msg_vec).unwrap_or("".to_owned())
@@ -505,7 +507,7 @@ impl InvokeUiSession for FlutterHandler {
             match hook {
                 SessionHook::OnSessionRgba(cb) => {
                     cb(key.to_owned(), rgba);
-                },
+                }
             }
         }
         // If the current rgba is not fetched by flutter, i.e., is valid.
@@ -618,6 +620,14 @@ impl InvokeUiSession for FlutterHandler {
                     .to_string(),
                 ),
                 ("resolutions", &resolutions),
+                (
+                    "original_width",
+                    &display.original_resolution.width.to_string(),
+                ),
+                (
+                    "original_height",
+                    &display.original_resolution.height.to_string(),
+                ),
             ],
         );
     }
@@ -688,10 +698,11 @@ pub fn session_add(
     id: &str,
     is_file_transfer: bool,
     is_port_forward: bool,
+    is_rdp: bool,
     switch_uuid: &str,
     force_relay: bool,
     password: String,
-) -> ResultType<()> {
+) -> ResultType<Session<FlutterHandler>> {
     let session_id = get_session_id(id.to_owned());
     LocalConfig::set_remote_id(&session_id);
 
@@ -704,11 +715,14 @@ pub fn session_add(
         ..Default::default()
     };
 
-    // TODO rdp
     let conn_type = if is_file_transfer {
         ConnType::FILE_TRANSFER
     } else if is_port_forward {
-        ConnType::PORT_FORWARD
+        if is_rdp {
+            ConnType::RDP
+        } else {
+            ConnType::PORT_FORWARD
+        }
     } else {
         ConnType::DEFAULT_CONN
     };
@@ -725,11 +739,15 @@ pub fn session_add(
         .unwrap()
         .initialize(session_id, conn_type, switch_uuid, force_relay);
 
-    if let Some(same_id_session) = SESSIONS.write().unwrap().insert(id.to_owned(), session) {
+    if let Some(same_id_session) = SESSIONS
+        .write()
+        .unwrap()
+        .insert(id.to_owned(), session.clone())
+    {
         same_id_session.close();
     }
 
-    Ok(())
+    Ok(session)
 }
 
 /// start a session with the given id.
@@ -850,7 +868,7 @@ pub mod connection_manager {
     impl FlutterHandler {
         fn push_event(&self, name: &str, event: Vec<(&str, &str)>) {
             let mut h: HashMap<&str, &str> = event.iter().cloned().collect();
-            assert!(h.get("name").is_none());
+            debug_assert!(h.get("name").is_none());
             h.insert("name", name);
 
             if let Some(s) = GLOBAL_EVENT_STREAM.read().unwrap().get(super::APP_TYPE_CM) {

@@ -498,5 +498,16 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Fingerprint", "Huella digital"),
         ("Copy Fingerprint", "Copiar huella digital"),
         ("no fingerprints", "sin huellas digitales"),
+        ("Select a peer", "Seleccionar un par"),
+        ("Select peers", "Seleccionar pares"),
+        ("Plugins", "Complementos"),
+        ("Uninstall", "Desinstalar"),
+        ("Update", "Actualizar"),
+        ("Enable", "Habilitar"),
+        ("Disable", "Inhabilitar"),
+        ("Options", "Opciones"),
+        ("resolution_original_tip", "Resolución original"),
+        ("resolution_fit_local_tip", "Ajustar resolución local"),
+        ("resolution_custom_tip", "Resolución personalizada"),
     ].iter().cloned().collect();
 }

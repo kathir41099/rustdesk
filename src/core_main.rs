@@ -106,15 +106,7 @@ pub fn core_main() -> Option<Vec<String>> {
     }
     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    if args.is_empty() || "--server" == (&args[0] as &str) {
-        #[cfg(debug_assertions)]
-        let load_plugins = true;
-        #[cfg(not(debug_assertions))]
-        let load_plugins = crate::platform::is_installed();
-        if load_plugins {
-            hbb_common::allow_err!(crate::plugin::load_plugins());
-        }
-    }
+    init_plugins(&args);
     if args.is_empty() {
         std::thread::spawn(move || crate::start_server(false));
     } else {
@@ -240,6 +232,22 @@ pub fn core_main() -> Option<Vec<String>> {
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             crate::flutter::connection_manager::start_cm_no_ui();
             return None;
+        } else {
+            #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+            #[cfg(not(any(target_os = "android", target_os = "ios")))]
+            if args[0] == "--plugin-install" {
+                if args.len() == 2 {
+                    crate::plugin::change_uninstall_plugin(&args[1], false);
+                } else if args.len() == 3 {
+                    crate::plugin::install_plugin_with_url(&args[1], &args[2]);
+                }
+                return None;
+            } else if args[0] == "--plugin-uninstall" {
+                if args.len() == 2 {
+                    crate::plugin::change_uninstall_plugin(&args[1], true);
+                }
+                return None;
+            }
         }
     }
     //_async_logger_holder.map(|x| x.flush());
@@ -247,6 +255,23 @@ pub fn core_main() -> Option<Vec<String>> {
     return Some(flutter_args);
     #[cfg(not(feature = "flutter"))]
     return Some(args);
+}
+
+#[inline]
+#[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+fn init_plugins(args: &Vec<String>) {
+    if args.is_empty() || "--server" == (&args[0] as &str) {
+        #[cfg(debug_assertions)]
+        let load_plugins = true;
+        #[cfg(not(debug_assertions))]
+        let load_plugins = crate::platform::is_installed();
+        if load_plugins {
+            crate::plugin::init();
+        }
+    } else if "--service" == (&args[0] as &str) {
+        hbb_common::allow_err!(crate::plugin::remove_uninstalled());
+    }
 }
 
 fn import_config(path: &str) {

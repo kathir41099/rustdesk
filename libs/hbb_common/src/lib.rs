@@ -46,6 +46,7 @@ pub mod keyboard;
 pub use sysinfo;
 #[cfg(not(any(target_os = "android", target_os = "ios")))]
 pub use dlopen;
+pub use toml;
 
 #[cfg(feature = "quic")]
 pub type Stream = quic::Connection;
@@ -286,7 +287,7 @@ pub fn get_time() -> i64 {
 
 #[inline]
 pub fn is_ipv4_str(id: &str) -> bool {
-    regex::Regex::new(r"^(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$")
+    regex::Regex::new(r"^(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:\d+)?$")
         .unwrap()
         .is_match(id)
 }
@@ -398,6 +399,7 @@ mod test {
     #[test]
     fn test_ipv4() {
         assert!(is_ipv4_str("1.2.3.4"));
+        assert!(is_ipv4_str("1.2.3.4:90"));
         assert!(is_ipv4_str("192.168.0.1"));
         assert!(is_ipv4_str("0.0.0.0"));
         assert!(is_ipv4_str("255.255.255.255"));

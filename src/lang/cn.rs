@@ -498,5 +498,16 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Fingerprint", "指纹"),
         ("Copy Fingerprint", "复制指纹"),
         ("no fingerprints", "没有指纹"),
+        ("Select a peer", "选择一个被控端"),
+        ("Select peers", "选择被控"),
+        ("Plugins", "插件"),
+        ("Uninstall", "卸载"),
+        ("Update", "更新"),
+        ("Enable", "启用"),
+        ("Disable", "禁用"),
+        ("Options", "选项"),
+        ("resolution_original_tip", "原始分辨率"),
+        ("resolution_fit_local_tip", "适应本地分辨率"),
+        ("resolution_custom_tip", "自定义分辨率"),
     ].iter().cloned().collect();
 }

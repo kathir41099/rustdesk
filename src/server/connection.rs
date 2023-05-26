@@ -65,6 +65,43 @@ lazy_static::lazy_static! {
 pub static CLICK_TIME: AtomicI64 = AtomicI64::new(0);
 pub static MOUSE_MOVE_TIME: AtomicI64 = AtomicI64::new(0);
 
+#[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+lazy_static::lazy_static! {
+    static ref PLUGIN_BLOCK_INPUT_TXS: Arc<Mutex<HashMap<String, std_mpsc::Sender<MessageInput>>>> = Default::default();
+    static ref PLUGIN_BLOCK_INPUT_TX_RX: (Arc<Mutex<std_mpsc::Sender<bool>>>, Arc<Mutex<std_mpsc::Receiver<bool>>>) = {
+        let (tx, rx) = std_mpsc::channel();
+        (Arc::new(Mutex::new(tx)), Arc::new(Mutex::new(rx)))
+    };
+}
+
+// Block input is required for some special cases, such as privacy mode.
+#[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+#[cfg(not(any(target_os = "android", target_os = "ios")))]
+pub fn plugin_block_input(peer: &str, block: bool) -> bool {
+    if let Some(tx) = PLUGIN_BLOCK_INPUT_TXS.lock().unwrap().get(peer) {
+        let _ = tx.send(if block {
+            MessageInput::BlockOnPlugin(peer.to_string())
+        } else {
+            MessageInput::BlockOffPlugin(peer.to_string())
+        });
+        match PLUGIN_BLOCK_INPUT_TX_RX
+            .1
+            .lock()
+            .unwrap()
+            .recv_timeout(std::time::Duration::from_millis(3_000))
+        {
+            Ok(b) => b == block,
+            Err(..) => {
+                log::error!("plugin_block_input timeout");
+                false
+            }
+        }
+    } else {
+        false
+    }
+}
+
 #[derive(Clone, Default)]
 pub struct ConnInner {
     id: i32,
@@ -79,6 +116,12 @@ enum MessageInput {
     Key((KeyEvent, bool)),
     BlockOn,
     BlockOff,
+    #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    BlockOnPlugin(String),
+    #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    BlockOffPlugin(String),
 }
 
 #[derive(Clone, Debug)]
@@ -136,8 +179,6 @@ pub struct Connection {
     #[cfg(windows)]
     portable: PortableState,
     from_switch: bool,
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    origin_resolution: HashMap<String, Resolution>,
     voice_call_request_timestamp: Option<NonZeroI64>,
     audio_input_device_before_voice_call: Option<String>,
     options_in_login: Option<OptionMessage>,
@@ -263,8 +304,6 @@ impl Connection {
             #[cfg(windows)]
             portable: Default::default(),
             from_switch: false,
-            #[cfg(not(any(target_os = "android", target_os = "ios")))]
-            origin_resolution: Default::default(),
             audio_sender: None,
             voice_call_request_timestamp: None,
             audio_input_device_before_voice_call: None,
@@ -278,6 +317,11 @@ impl Connection {
             #[cfg(not(any(feature = "flatpak", feature = "appimage")))]
             tx_desktop_ready: _tx_desktop_ready,
         };
+        if !conn.on_open(addr).await {
+            // sleep to ensure msg got received.
+            sleep(1.).await;
+            return;
+        }
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         tokio::spawn(async move {
             if let Err(err) =
@@ -288,10 +332,6 @@ impl Connection {
         });
         #[cfg(target_os = "android")]
         start_channel(rx_to_cm, tx_from_cm);
-
-        if !conn.on_open(addr).await {
-            return;
-        }
         if !conn.keyboard {
             conn.send_permission(Permission::Keyboard, false).await;
         }
@@ -587,14 +627,17 @@ impl Connection {
         conn.post_conn_audit(json!({
             "action": "close",
         }));
-        #[cfg(not(any(target_os = "android", target_os = "ios")))]
-        conn.reset_resolution();
-        ALIVE_CONNS.lock().unwrap().retain(|&c| c != id);
+        let mut active_conns_lock = ALIVE_CONNS.lock().unwrap();
+        active_conns_lock.retain(|&c| c != id);
         if let Some(s) = conn.server.upgrade() {
             let mut s = s.write().unwrap();
             s.remove_connection(&conn.inner);
             #[cfg(not(any(target_os = "android", target_os = "ios")))]
             try_stop_record_cursor_pos();
+        }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if active_conns_lock.is_empty() {
+            video_service::reset_resolutions();
         }
         log::info!("#{} connection loop exited", id);
     }
@@ -645,6 +688,30 @@ impl Connection {
                                 back_notification::BlockInputState::BlkOffFailed,
                             );
                         }
+                    }
+                    #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    MessageInput::BlockOnPlugin(_peer) => {
+                        if crate::platform::block_input(true) {
+                            block_input_mode = true;
+                        }
+                        let _r = PLUGIN_BLOCK_INPUT_TX_RX
+                            .0
+                            .lock()
+                            .unwrap()
+                            .send(block_input_mode);
+                    }
+                    #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+                    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+                    MessageInput::BlockOffPlugin(_peer) => {
+                        if crate::platform::block_input(false) {
+                            block_input_mode = false;
+                        }
+                        let _r = PLUGIN_BLOCK_INPUT_TX_RX
+                            .0
+                            .lock()
+                            .unwrap()
+                            .send(block_input_mode);
                     }
                 },
                 Err(err) => {
@@ -727,8 +794,17 @@ impl Connection {
         self.send(msg_out).await;
     }
 
-    async fn on_open(&mut self, addr: SocketAddr) -> bool {
-        log::debug!("#{} Connection opened from {}.", self.inner.id, addr);
+    async fn check_privacy_mode_on(&mut self) -> bool {
+        if video_service::get_privacy_mode_conn_id() > 0 {
+            self.send_login_error("Someone turns on privacy mode, exit")
+                .await;
+            false
+        } else {
+            true
+        }
+    }
+
+    async fn check_whitelist(&mut self, addr: &SocketAddr) -> bool {
         let whitelist: Vec<String> = Config::get_option("whitelist")
             .split(",")
             .filter(|x| !x.is_empty())
@@ -751,11 +827,19 @@ impl Connection {
             Self::post_alarm_audit(
                 AlarmAuditType::IpWhitelist, //"ip whitelist",
                 true,
-                json!({
-                            "ip":addr.ip(),
-                }),
+                json!({ "ip":addr.ip() }),
             );
-            sleep(1.).await;
+            return false;
+        }
+        true
+    }
+
+    async fn on_open(&mut self, addr: SocketAddr) -> bool {
+        log::debug!("#{} Connection opened from {}.", self.inner.id, addr);
+        if !self.check_privacy_mode_on().await {
+            return false;
+        }
+        if !self.check_whitelist(&addr).await {
             return false;
         }
         self.ip = addr.ip().to_string();
@@ -944,6 +1028,12 @@ impl Connection {
             }
         }
         self.authorized = true;
+        #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        PLUGIN_BLOCK_INPUT_TXS
+            .lock()
+            .unwrap()
+            .insert(self.lr.my_id.clone(), self.tx_input.clone());
 
         pi.username = username;
         pi.sas_enabled = sas_enabled;
@@ -952,6 +1042,8 @@ impl Connection {
             ..Default::default()
         })
         .into();
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        video_service::try_reset_current_display();
         #[cfg(not(any(target_os = "android", target_os = "ios")))]
         {
             pi.resolutions = Some(SupportedResolutions {
@@ -1015,7 +1107,7 @@ impl Connection {
                 }
                 let mut s = s.write().unwrap();
                 #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                try_start_record_cursor_pos();
+                let _h = try_start_record_cursor_pos();
                 s.add_connection(self.inner.clone(), &noperms);
             }
         }
@@ -1802,25 +1894,7 @@ impl Connection {
                         }
                     }
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
-                    Some(misc::Union::ChangeResolution(r)) => {
-                        if self.keyboard {
-                            if let Ok(name) = video_service::get_current_display_name() {
-                                if let Ok(current) = crate::platform::current_resolution(&name) {
-                                    if let Err(e) = crate::platform::change_resolution(
-                                        &name,
-                                        r.width as _,
-                                        r.height as _,
-                                    ) {
-                                        log::error!("change resolution failed:{:?}", e);
-                                    } else {
-                                        if !self.origin_resolution.contains_key(&name) {
-                                            self.origin_resolution.insert(name, current);
-                                        }
-                                    }
-                                }
-                            }
-                        }
-                    }
+                    Some(misc::Union::ChangeResolution(r)) => self.change_resolution(&r),
                     #[cfg(all(feature = "flutter", feature = "plugin_framework"))]
                     #[cfg(not(any(target_os = "android", target_os = "ios")))]
                     Some(misc::Union::PluginRequest(p)) => {
@@ -1860,6 +1934,35 @@ impl Connection {
             }
         }
         true
+    }
+
+    #[cfg(not(any(target_os = "android", target_os = "ios")))]
+    fn change_resolution(&mut self, r: &Resolution) {
+        if self.keyboard {
+            if let Ok(name) = video_service::get_current_display_name() {
+                #[cfg(all(windows, feature = "virtual_display_driver"))]
+                if let Some(_ok) =
+                    crate::virtual_display_manager::change_resolution_if_is_virtual_display(
+                        &name,
+                        r.width as _,
+                        r.height as _,
+                    )
+                {
+                    return;
+                }
+                if let Err(e) =
+                    crate::platform::change_resolution(&name, r.width as _, r.height as _)
+                {
+                    log::error!(
+                        "Failed to change resolution '{}' to ({},{}):{:?}",
+                        &name,
+                        r.width,
+                        r.height,
+                        e
+                    );
+                }
+            }
+        }
     }
 
     pub async fn handle_voice_call(&mut self, accepted: bool) {
@@ -2056,6 +2159,12 @@ impl Connection {
                 }
             }
         }
+        #[cfg(not(any(target_os = "android", target_os = "ios")))]
+        if let Some(custom_resolution) = o.custom_resolution.as_ref() {
+            if custom_resolution.width > 0 && custom_resolution.height > 0 {
+                self.change_resolution(&custom_resolution);
+            }
+        }
         if self.keyboard {
             if let Ok(q) = o.block_input.enum_value() {
                 match q {
@@ -2169,20 +2278,6 @@ impl Connection {
                 }
             }
         }
-    }
-
-    #[cfg(not(any(target_os = "android", target_os = "ios")))]
-    fn reset_resolution(&self) {
-        self.origin_resolution
-            .iter()
-            .map(|(name, r)| {
-                if let Err(e) =
-                    crate::platform::change_resolution(&name, r.width as _, r.height as _)
-                {
-                    log::error!("change resolution failed:{:?}", e);
-                }
-            })
-            .count();
     }
 
     #[cfg(not(any(target_os = "android", target_os = "ios")))]

@@ -288,8 +288,8 @@ class ServerModel with ChangeNotifier {
   /// Toggle the screen sharing service.
   toggleService() async {
     if (_isStart) {
-      final res =
-          await parent.target?.dialogManager.show<bool>((setState, close) {
+      final res = await parent.target?.dialogManager
+          .show<bool>((setState, close, context) {
         submit() => close(true);
         return CustomAlertDialog(
           title: Row(children: [
@@ -311,8 +311,8 @@ class ServerModel with ChangeNotifier {
         stopService();
       }
     } else {
-      final res =
-          await parent.target?.dialogManager.show<bool>((setState, close) {
+      final res = await parent.target?.dialogManager
+          .show<bool>((setState, close, context) {
         submit() => close(true);
         return CustomAlertDialog(
           title: Row(children: [
@@ -481,7 +481,7 @@ class ServerModel with ChangeNotifier {
   }
 
   void showLoginDialog(Client client) {
-    parent.target?.dialogManager.show((setState, close) {
+    parent.target?.dialogManager.show((setState, close, context) {
       cancel() {
         sendLoginResponse(client, false);
         close();
@@ -699,7 +699,7 @@ String getLoginDialogTag(int id) {
 }
 
 showInputWarnAlert(FFI ffi) {
-  ffi.dialogManager.show((setState, close) {
+  ffi.dialogManager.show((setState, close, context) {
     submit() {
       AndroidPermissionManager.startAction(kActionAccessibilitySettings);
       close();
@@ -726,7 +726,7 @@ showInputWarnAlert(FFI ffi) {
 }
 
 Future<void> showClientsMayNotBeChangedAlert(FFI? ffi) async {
-  await ffi?.dialogManager.show((setState, close) {
+  await ffi?.dialogManager.show((setState, close, context) {
     return CustomAlertDialog(
       title: Text(translate("Permissions")),
       content: Column(

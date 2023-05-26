@@ -498,5 +498,16 @@ pub static ref T: std::collections::HashMap<&'static str, &'static str> =
         ("Fingerprint", "Отпечаток"),
         ("Copy Fingerprint", "Копировать отпечаток"),
         ("no fingerprints", "отпечатки отсутствуют"),
+        ("Select a peer", "Выберите удалённый узел"),
+        ("Select peers", "Выберите удалённые узлы"),
+        ("Plugins", "Плагины"),
+        ("Uninstall", "Удалить"),
+        ("Update", "Обновить"),
+        ("Enable", "Включить"),
+        ("Disable", "Отключить"),
+        ("Options", "Настройки"),
+        ("resolution_original_tip", "Исходное разрешение"),
+        ("resolution_fit_local_tip", "Соответствие локальному разрешению"),
+        ("resolution_custom_tip", "Произвольное разрешение"),
     ].iter().cloned().collect();
 }

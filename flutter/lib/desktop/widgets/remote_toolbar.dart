@@ -8,7 +8,7 @@ import 'package:flutter_hbb/models/chat_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/consts.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
-import 'package:flutter_hbb/plugin/widget.dart';
+import 'package:flutter_hbb/plugin/widgets/desc_ui.dart';
 import 'package:flutter_hbb/plugin/common.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:get/get.dart';
@@ -327,6 +327,13 @@ class _RemoteMenubarState extends State<RemoteMenubar> {
   initState() {
     super.initState();
 
+    Future.delayed(Duration.zero, () async {
+      _fractionX.value = double.tryParse(await bind.sessionGetOption(
+                  id: widget.id, arg: 'remote-menubar-drag-x') ??
+              '0.5') ??
+          0.5;
+    });
+
     _debouncerHide = Debouncer<int>(
       Duration(milliseconds: 5000),
       onChanged: _debouncerHideProc,
@@ -380,6 +387,7 @@ class _RemoteMenubarState extends State<RemoteMenubar> {
             elevation: _MenubarTheme.elevation,
             shadowColor: MyTheme.color(context).shadow,
             child: _DraggableShowHide(
+              id: widget.id,
               dragging: _dragging,
               fractionX: _fractionX,
               show: show,
@@ -652,69 +660,24 @@ class _ControlMenu extends StatelessWidget {
   }
 }
 
-class _DisplayMenu extends StatefulWidget {
+class ScreenAdjustor {
   final String id;
   final FFI ffi;
-  final MenubarState state;
-  final Function(bool) setFullscreen;
-  final Widget pluginItem;
-  _DisplayMenu(
-      {Key? key,
-      required this.id,
-      required this.ffi,
-      required this.state,
-      required this.setFullscreen})
-      : pluginItem = LocationItem.createLocationItem(
-          id,
-          ffi,
-          kLocationClientRemoteToolbarDisplay,
-          true,
-        ),
-        super(key: key);
-
-  @override
-  State<_DisplayMenu> createState() => _DisplayMenuState();
-}
-
-class _DisplayMenuState extends State<_DisplayMenu> {
+  final VoidCallback cbExitFullscreen;
   window_size.Screen? _screen;
 
+  ScreenAdjustor({
+    required this.id,
+    required this.ffi,
+    required this.cbExitFullscreen,
+  });
+
   bool get isFullscreen => stateGlobal.fullscreen;
-
   int get windowId => stateGlobal.windowId;
-
-  Map<String, bool> get perms => widget.ffi.ffiModel.permissions;
-
-  PeerInfo get pi => widget.ffi.ffiModel.pi;
-  FfiModel get ffiModel => widget.ffi.ffiModel;
-  FFI get ffi => widget.ffi;
-  String get id => widget.id;
-
-  @override
-  Widget build(BuildContext context) {
-    _updateScreen();
-    return _IconSubmenuButton(
-        tooltip: 'Display Settings',
-        svg: "assets/display.svg",
-        ffi: widget.ffi,
-        color: _MenubarTheme.blueColor,
-        hoverColor: _MenubarTheme.hoverBlueColor,
-        menuChildren: [
-          adjustWindow(),
-          viewStyle(),
-          scrollStyle(),
-          imageQuality(),
-          codec(),
-          resolutions(),
-          Divider(),
-          toggles(),
-          widget.pluginItem,
-        ]);
-  }
 
   adjustWindow() {
     return futureBuilder(
-        future: _isWindowCanBeAdjusted(),
+        future: isWindowCanBeAdjusted(),
         hasData: (data) {
           final visible = data as bool;
           if (!visible) return Offstage();
@@ -722,18 +685,18 @@ class _DisplayMenuState extends State<_DisplayMenu> {
             children: [
               MenuButton(
                   child: Text(translate('Adjust Window')),
-                  onPressed: _doAdjustWindow,
-                  ffi: widget.ffi),
+                  onPressed: doAdjustWindow,
+                  ffi: ffi),
               Divider(),
             ],
           );
         });
   }
 
-  _doAdjustWindow() async {
-    await _updateScreen();
+  doAdjustWindow() async {
+    await updateScreen();
     if (_screen != null) {
-      widget.setFullscreen(false);
+      cbExitFullscreen();
       double scale = _screen!.scaleFactor;
       final wndRect = await WindowController.fromWindowId(windowId).getFrame();
       final mediaSize = MediaQueryData.fromWindow(ui.window).size;
@@ -744,7 +707,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
       double magicHeight =
           wndRect.bottom - wndRect.top - mediaSize.height * scale;
 
-      final canvasModel = widget.ffi.canvasModel;
+      final canvasModel = ffi.canvasModel;
       final width = (canvasModel.getDisplayWidth() * canvasModel.scale +
                   CanvasModel.leftToEdge +
                   CanvasModel.rightToEdge) *
@@ -779,7 +742,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
     }
   }
 
-  _updateScreen() async {
+  updateScreen() async {
     final v = await rustDeskWinManager.call(
         WindowType.Main, kWindowGetWindowInfo, '');
     final String valueStr = v;
@@ -799,8 +762,8 @@ class _DisplayMenuState extends State<_DisplayMenu> {
     }
   }
 
-  Future<bool> _isWindowCanBeAdjusted() async {
-    final viewStyle = await bind.sessionGetViewStyle(id: widget.id) ?? '';
+  Future<bool> isWindowCanBeAdjusted() async {
+    final viewStyle = await bind.sessionGetViewStyle(id: id) ?? '';
     if (viewStyle != kRemoteViewStyleOriginal) {
       return false;
     }
@@ -819,7 +782,7 @@ class _DisplayMenuState extends State<_DisplayMenu> {
       selfHeight = _screen!.frame.height;
     }
 
-    final canvasModel = widget.ffi.canvasModel;
+    final canvasModel = ffi.canvasModel;
     final displayWidth = canvasModel.getDisplayWidth();
     final displayHeight = canvasModel.getDisplayHeight();
     final requiredWidth =
@@ -828,6 +791,77 @@ class _DisplayMenuState extends State<_DisplayMenu> {
         CanvasModel.topToEdge + displayHeight + CanvasModel.bottomToEdge;
     return selfWidth > (requiredWidth * scale) &&
         selfHeight > (requiredHeight * scale);
+  }
+}
+
+class _DisplayMenu extends StatefulWidget {
+  final String id;
+  final FFI ffi;
+  final MenubarState state;
+  final Function(bool) setFullscreen;
+  final Widget pluginItem;
+  _DisplayMenu(
+      {Key? key,
+      required this.id,
+      required this.ffi,
+      required this.state,
+      required this.setFullscreen})
+      : pluginItem = LocationItem.createLocationItem(
+          id,
+          ffi,
+          kLocationClientRemoteToolbarDisplay,
+          true,
+        ),
+        super(key: key);
+
+  @override
+  State<_DisplayMenu> createState() => _DisplayMenuState();
+}
+
+class _DisplayMenuState extends State<_DisplayMenu> {
+  late final ScreenAdjustor _screenAdjustor = ScreenAdjustor(
+    id: widget.id,
+    ffi: widget.ffi,
+    cbExitFullscreen: () => widget.setFullscreen(false),
+  );
+
+  bool get isFullscreen => stateGlobal.fullscreen;
+  int get windowId => stateGlobal.windowId;
+  Map<String, bool> get perms => widget.ffi.ffiModel.permissions;
+  PeerInfo get pi => widget.ffi.ffiModel.pi;
+  FfiModel get ffiModel => widget.ffi.ffiModel;
+  FFI get ffi => widget.ffi;
+  String get id => widget.id;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    _screenAdjustor.updateScreen();
+    return _IconSubmenuButton(
+        tooltip: 'Display Settings',
+        svg: "assets/display.svg",
+        ffi: widget.ffi,
+        color: _MenubarTheme.blueColor,
+        hoverColor: _MenubarTheme.hoverBlueColor,
+        menuChildren: [
+          _screenAdjustor.adjustWindow(),
+          viewStyle(),
+          scrollStyle(),
+          imageQuality(),
+          codec(),
+          _ResolutionsMenu(
+            id: widget.id,
+            ffi: widget.ffi,
+            screenAdjustor: _screenAdjustor,
+          ),
+          Divider(),
+          toggles(),
+          widget.pluginItem,
+        ]);
   }
 
   viewStyle() {
@@ -927,46 +961,6 @@ class _DisplayMenuState extends State<_DisplayMenu> {
         });
   }
 
-  resolutions() {
-    final resolutions = pi.resolutions;
-    final visible = ffiModel.keyboard && resolutions.length > 1;
-    if (!visible) return Offstage();
-    final display = ffiModel.display;
-    final groupValue = "${display.width}x${display.height}";
-    onChanged(String? value) async {
-      if (value == null) return;
-      final list = value.split('x');
-      if (list.length == 2) {
-        final w = int.tryParse(list[0]);
-        final h = int.tryParse(list[1]);
-        if (w != null && h != null) {
-          await bind.sessionChangeResolution(
-              id: widget.id, width: w, height: h);
-          Future.delayed(Duration(seconds: 3), () async {
-            final display = ffiModel.display;
-            if (w == display.width && h == display.height) {
-              if (await _isWindowCanBeAdjusted()) {
-                _doAdjustWindow();
-              }
-            }
-          });
-        }
-      }
-    }
-
-    return _SubmenuButton(
-        ffi: widget.ffi,
-        menuChildren: resolutions
-            .map((e) => RdoMenuButton(
-                value: '${e.width}x${e.height}',
-                groupValue: groupValue,
-                onChanged: onChanged,
-                ffi: widget.ffi,
-                child: Text('${e.width}x${e.height}')))
-            .toList(),
-        child: Text(translate("Resolution")));
-  }
-
   toggles() {
     return futureBuilder(
         future: toolbarDisplayToggle(context, id, ffi),
@@ -982,6 +976,263 @@ class _DisplayMenuState extends State<_DisplayMenu> {
                       ffi: ffi))
                   .toList());
         });
+  }
+}
+
+class _ResolutionsMenu extends StatefulWidget {
+  final String id;
+  final FFI ffi;
+  final ScreenAdjustor screenAdjustor;
+
+  _ResolutionsMenu({
+    Key? key,
+    required this.id,
+    required this.ffi,
+    required this.screenAdjustor,
+  }) : super(key: key);
+
+  @override
+  State<_ResolutionsMenu> createState() => _ResolutionsMenuState();
+}
+
+const double _kCustonResolutionEditingWidth = 42;
+const _kCustomResolutionValue = 'custom';
+
+class _ResolutionsMenuState extends State<_ResolutionsMenu> {
+  String _groupValue = '';
+  Resolution? _localResolution;
+
+  late final TextEditingController _customWidth =
+      TextEditingController(text: display.width.toString());
+  late final TextEditingController _customHeight =
+      TextEditingController(text: display.height.toString());
+
+  PeerInfo get pi => widget.ffi.ffiModel.pi;
+  FfiModel get ffiModel => widget.ffi.ffiModel;
+  Display get display => ffiModel.display;
+  List<Resolution> get resolutions => pi.resolutions;
+
+  @override
+  void initState() {
+    super.initState();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isVirtualDisplay = display.isVirtualDisplayResolution;
+    final visible =
+        ffiModel.keyboard && (isVirtualDisplay || resolutions.length > 1);
+    if (!visible) return Offstage();
+    _getLocalResolution();
+    final showOriginalBtn =
+        display.isOriginalResolutionSet && !display.isOriginalResolution;
+    final showFitLocalBtn = !_isRemoteResolutionFitLocal();
+    _setGroupValue();
+    return _SubmenuButton(
+      ffi: widget.ffi,
+      menuChildren: <Widget>[
+            _OriginalResolutionMenuButton(showOriginalBtn),
+            _FitLocalResolutionMenuButton(showFitLocalBtn),
+            _customResolutionMenuButton(isVirtualDisplay),
+            _menuDivider(showOriginalBtn, showFitLocalBtn, isVirtualDisplay),
+          ] +
+          _supportedResolutionMenuButtons(),
+      child: Text(translate("Resolution")),
+    );
+  }
+
+  _setGroupValue() {
+    final lastGroupValue =
+        stateGlobal.getLastResolutionGroupValue(widget.id, pi.currentDisplay);
+    if (lastGroupValue == _kCustomResolutionValue) {
+      _groupValue = _kCustomResolutionValue;
+    } else {
+      _groupValue = '${display.width}x${display.height}';
+    }
+  }
+
+  _menuDivider(
+      bool showOriginalBtn, bool showFitLocalBtn, bool isVirtualDisplay) {
+    return Offstage(
+      offstage: !(showOriginalBtn || showFitLocalBtn || isVirtualDisplay),
+      child: Divider(),
+    );
+  }
+
+  _getLocalResolution() {
+    _localResolution = null;
+    final String currentDisplay = bind.mainGetCurrentDisplay();
+    if (currentDisplay.isNotEmpty) {
+      try {
+        final display = json.decode(currentDisplay);
+        if (display['w'] != null && display['h'] != null) {
+          _localResolution = Resolution(display['w'], display['h']);
+        }
+      } catch (e) {
+        debugPrint('Failed to decode $currentDisplay, $e');
+      }
+    }
+  }
+
+  _onChanged(String? value) async {
+    stateGlobal.setLastResolutionGroupValue(
+        widget.id, pi.currentDisplay, value);
+    if (value == null) return;
+
+    int? w;
+    int? h;
+    if (value == _kCustomResolutionValue) {
+      w = int.tryParse(_customWidth.text);
+      h = int.tryParse(_customHeight.text);
+    } else {
+      final list = value.split('x');
+      if (list.length == 2) {
+        w = int.tryParse(list[0]);
+        h = int.tryParse(list[1]);
+      }
+    }
+
+    if (w != null && h != null) {
+      if (w != display.width || h != display.height) {
+        await _changeResolution(w, h);
+      }
+    }
+  }
+
+  _changeResolution(int w, int h) async {
+    await bind.sessionChangeResolution(
+      id: widget.id,
+      width: w,
+      height: h,
+    );
+    Future.delayed(Duration(seconds: 3), () async {
+      final display = ffiModel.display;
+      if (w == display.width && h == display.height) {
+        if (await widget.screenAdjustor.isWindowCanBeAdjusted()) {
+          widget.screenAdjustor.doAdjustWindow();
+        }
+      }
+    });
+  }
+
+  Widget _OriginalResolutionMenuButton(bool showOriginalBtn) {
+    return Offstage(
+      offstage: !showOriginalBtn,
+      child: MenuButton(
+        onPressed: () =>
+            _changeResolution(display.originalWidth, display.originalHeight),
+        ffi: widget.ffi,
+        child: Text(
+            '${translate('resolution_original_tip')} ${display.originalWidth}x${display.originalHeight}'),
+      ),
+    );
+  }
+
+  Widget _FitLocalResolutionMenuButton(bool showFitLocalBtn) {
+    return Offstage(
+      offstage: !showFitLocalBtn,
+      child: MenuButton(
+        onPressed: () {
+          final resolution = _getBestFitResolution();
+          if (resolution != null) {
+            _changeResolution(resolution.width, resolution.height);
+          }
+        },
+        ffi: widget.ffi,
+        child: Text(
+            '${translate('resolution_fit_local_tip')} ${_localResolution?.width ?? 0}x${_localResolution?.height ?? 0}'),
+      ),
+    );
+  }
+
+  Widget _customResolutionMenuButton(isVirtualDisplay) {
+    return Offstage(
+      offstage: !isVirtualDisplay,
+      child: RdoMenuButton(
+        value: _kCustomResolutionValue,
+        groupValue: _groupValue,
+        onChanged: _onChanged,
+        ffi: widget.ffi,
+        child: Row(
+          children: [
+            Text('${translate('resolution_custom_tip')} '),
+            SizedBox(
+              width: _kCustonResolutionEditingWidth,
+              child: _resolutionInput(_customWidth),
+            ),
+            Text(' x '),
+            SizedBox(
+              width: _kCustonResolutionEditingWidth,
+              child: _resolutionInput(_customHeight),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  TextField _resolutionInput(TextEditingController controller) {
+    return TextField(
+      decoration: InputDecoration(
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: EdgeInsets.fromLTRB(3, 3, 3, 3),
+      ),
+      keyboardType: TextInputType.number,
+      inputFormatters: <TextInputFormatter>[
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(4),
+        FilteringTextInputFormatter.allow(RegExp(r'[0-9]')),
+      ],
+      controller: controller,
+    );
+  }
+
+  List<Widget> _supportedResolutionMenuButtons() => resolutions
+      .map((e) => RdoMenuButton(
+          value: '${e.width}x${e.height}',
+          groupValue: _groupValue,
+          onChanged: _onChanged,
+          ffi: widget.ffi,
+          child: Text('${e.width}x${e.height}')))
+      .toList();
+
+  Resolution? _getBestFitResolution() {
+    if (_localResolution == null) {
+      return null;
+    }
+
+    if (display.isVirtualDisplayResolution) {
+      return _localResolution!;
+    }
+
+    squareDistance(Resolution lhs, Resolution rhs) =>
+        (lhs.width - rhs.width) * (lhs.width - rhs.width) +
+        (lhs.height - rhs.height) * (lhs.height - rhs.height);
+
+    Resolution res = Resolution(display.width, display.height);
+    for (final r in resolutions) {
+      if (r.width <= _localResolution!.width &&
+          r.height <= _localResolution!.height) {
+        if (squareDistance(r, _localResolution!) <
+            squareDistance(res, _localResolution!)) {
+          res = r;
+        }
+      }
+    }
+    return res;
+  }
+
+  bool _isRemoteResolutionFitLocal() {
+    if (_localResolution == null) {
+      return true;
+    }
+    final bestFitResolution = _getBestFitResolution();
+    if (bestFitResolution == null) {
+      return true;
+    }
+    return bestFitResolution.width == display.width &&
+        bestFitResolution.height == display.height;
   }
 }
 
@@ -1475,14 +1726,14 @@ class RdoMenuButton<T> extends StatelessWidget {
   final ValueChanged<T?>? onChanged;
   final Widget? child;
   final FFI ffi;
-  const RdoMenuButton(
-      {Key? key,
-      required this.value,
-      required this.groupValue,
-      required this.onChanged,
-      required this.child,
-      required this.ffi})
-      : super(key: key);
+  const RdoMenuButton({
+    Key? key,
+    required this.value,
+    required this.groupValue,
+    required this.child,
+    required this.ffi,
+    this.onChanged,
+  }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
@@ -1501,11 +1752,13 @@ class RdoMenuButton<T> extends StatelessWidget {
 }
 
 class _DraggableShowHide extends StatefulWidget {
+  final String id;
   final RxDouble fractionX;
   final RxBool dragging;
   final RxBool show;
   const _DraggableShowHide({
     Key? key,
+    required this.id,
     required this.fractionX,
     required this.dragging,
     required this.show,
@@ -1518,6 +1771,30 @@ class _DraggableShowHide extends StatefulWidget {
 class _DraggableShowHideState extends State<_DraggableShowHide> {
   Offset position = Offset.zero;
   Size size = Size.zero;
+  double left = 0.0;
+  double right = 1.0;
+
+  @override
+  initState() {
+    super.initState();
+
+    final confLeft = double.tryParse(
+        bind.mainGetLocalOption(key: 'remote-menubar-drag-left'));
+    if (confLeft == null) {
+      bind.mainSetLocalOption(
+          key: 'remote-menubar-drag-left', value: left.toString());
+    } else {
+      left = confLeft;
+    }
+    final confRight = double.tryParse(
+        bind.mainGetLocalOption(key: 'remote-menubar-drag-right'));
+    if (confRight == null) {
+      bind.mainSetLocalOption(
+          key: 'remote-menubar-drag-right', value: right.toString());
+    } else {
+      right = confRight;
+    }
+  }
 
   Widget _buildDraggable(BuildContext context) {
     return Draggable(
@@ -1541,12 +1818,17 @@ class _DraggableShowHideState extends State<_DraggableShowHide> {
         final mediaSize = MediaQueryData.fromWindow(ui.window).size;
         widget.fractionX.value +=
             (details.offset.dx - position.dx) / (mediaSize.width - size.width);
-        if (widget.fractionX.value < 0.35) {
-          widget.fractionX.value = 0.35;
+        if (widget.fractionX.value < left) {
+          widget.fractionX.value = left;
         }
-        if (widget.fractionX.value > 0.65) {
-          widget.fractionX.value = 0.65;
+        if (widget.fractionX.value > right) {
+          widget.fractionX.value = right;
         }
+        bind.sessionPeerOption(
+          id: widget.id,
+          name: 'remote-menubar-drag-x',
+          value: widget.fractionX.value.toString(),
+        );
         widget.dragging.value = false;
       },
     );

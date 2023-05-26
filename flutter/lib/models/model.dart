@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
@@ -17,8 +18,8 @@ import 'package:flutter_hbb/models/server_model.dart';
 import 'package:flutter_hbb/models/user_model.dart';
 import 'package:flutter_hbb/models/state_model.dart';
 import 'package:flutter_hbb/plugin/event.dart';
-import 'package:flutter_hbb/plugin/desc.dart';
-import 'package:flutter_hbb/plugin/widget.dart';
+import 'package:flutter_hbb/plugin/manager.dart';
+import 'package:flutter_hbb/plugin/widgets/desc_ui.dart';
 import 'package:flutter_hbb/common/shared_state.dart';
 import 'package:flutter_hbb/utils/multi_window_manager.dart';
 import 'package:tuple/tuple.dart';
@@ -230,8 +231,8 @@ class FfiModel with ChangeNotifier {
         parent.target?.serverModel.updateVoiceCallState(evt);
       } else if (name == 'fingerprint') {
         FingerprintState.find(peerId).value = evt['fingerprint'] ?? '';
-      } else if (name == 'plugin_desc') {
-        updateDesc(evt);
+      } else if (name == 'plugin_manager') {
+        pluginManager.handleEvent(evt);
       } else if (name == 'plugin_event') {
         handlePluginEvent(
             evt, peerId, (Map<String, dynamic> e) => handleMsgBox(e, peerId));
@@ -295,11 +296,15 @@ class FfiModel with ChangeNotifier {
   handleSwitchDisplay(Map<String, dynamic> evt, String peerId) {
     _pi.currentDisplay = int.parse(evt['display']);
     var newDisplay = Display();
-    newDisplay.x = double.parse(evt['x']);
-    newDisplay.y = double.parse(evt['y']);
-    newDisplay.width = int.parse(evt['width']);
-    newDisplay.height = int.parse(evt['height']);
-    newDisplay.cursorEmbedded = int.parse(evt['cursor_embedded']) == 1;
+    newDisplay.x = double.tryParse(evt['x']) ?? newDisplay.x;
+    newDisplay.y = double.tryParse(evt['y']) ?? newDisplay.y;
+    newDisplay.width = int.tryParse(evt['width']) ?? newDisplay.width;
+    newDisplay.height = int.tryParse(evt['height']) ?? newDisplay.height;
+    newDisplay.cursorEmbedded = int.tryParse(evt['cursor_embedded']) == 1;
+    newDisplay.originalWidth =
+        int.tryParse(evt['original_width']) ?? kInvalidResolutionValue;
+    newDisplay.originalHeight =
+        int.tryParse(evt['original_height']) ?? kInvalidResolutionValue;
 
     _updateCurDisplay(peerId, newDisplay);
 
@@ -383,7 +388,7 @@ class FfiModel with ChangeNotifier {
 
   void showRelayHintDialog(String id, String type, String title, String text,
       OverlayDialogManager dialogManager) {
-    dialogManager.show(tag: '$id-$type', (setState, close) {
+    dialogManager.show(tag: '$id-$type', (setState, close, context) {
       onClose() {
         closeConnection();
         close();
@@ -466,14 +471,7 @@ class FfiModel with ChangeNotifier {
       _pi.displays = [];
       List<dynamic> displays = json.decode(evt['displays']);
       for (int i = 0; i < displays.length; ++i) {
-        Map<String, dynamic> d0 = displays[i];
-        var d = Display();
-        d.x = d0['x'].toDouble();
-        d.y = d0['y'].toDouble();
-        d.width = d0['width'];
-        d.height = d0['height'];
-        d.cursorEmbedded = d0['cursor_embedded'] == 1;
-        _pi.displays.add(d);
+        _pi.displays.add(evtToDisplay(displays[i]));
       }
       stateGlobal.displaysCount.value = _pi.displays.length;
       if (_pi.currentDisplay < _pi.displays.length) {
@@ -506,6 +504,9 @@ class FfiModel with ChangeNotifier {
         }
       }
     }
+
+    stateGlobal.resetLastResolutionGroupValues(peerId);
+
     notifyListeners();
   }
 
@@ -533,20 +534,25 @@ class FfiModel with ChangeNotifier {
     }
   }
 
+  Display evtToDisplay(Map<String, dynamic> evt) {
+    var d = Display();
+    d.x = evt['x']?.toDouble() ?? d.x;
+    d.y = evt['y']?.toDouble() ?? d.y;
+    d.width = evt['width'] ?? d.width;
+    d.height = evt['height'] ?? d.height;
+    d.cursorEmbedded = evt['cursor_embedded'] == 1;
+    d.originalWidth = evt['original_width'] ?? kInvalidResolutionValue;
+    d.originalHeight = evt['original_height'] ?? kInvalidResolutionValue;
+    return d;
+  }
+
   /// Handle the peer info synchronization event based on [evt].
   handleSyncPeerInfo(Map<String, dynamic> evt, String peerId) async {
     if (evt['displays'] != null) {
       List<dynamic> displays = json.decode(evt['displays']);
       List<Display> newDisplays = [];
       for (int i = 0; i < displays.length; ++i) {
-        Map<String, dynamic> d0 = displays[i];
-        var d = Display();
-        d.x = d0['x'].toDouble();
-        d.y = d0['y'].toDouble();
-        d.width = d0['width'];
-        d.height = d0['height'];
-        d.cursorEmbedded = d0['cursor_embedded'] == 1;
-        newDisplays.add(d);
+        newDisplays.add(evtToDisplay(displays[i]));
       }
       _pi.displays = newDisplays;
       stateGlobal.displaysCount.value = _pi.displays.length;
@@ -1062,7 +1068,7 @@ class CursorData {
               height: (height * scale).toInt(),
               interpolation: img2.Interpolation.average,
             )
-            .getBytes(format: img2.Format.bgra);
+            .getBytes(order: img2.ChannelOrder.bgra);
       } else {
         data = Uint8List.fromList(
           img2.encodePng(
@@ -1128,13 +1134,13 @@ class PredefinedCursor {
       () async {
         final defaultImg = _image2!;
         // This function is called only one time, no need to care about the performance.
-        Uint8List data = defaultImg.getBytes(format: img2.Format.rgba);
+        Uint8List data = defaultImg.getBytes(order: img2.ChannelOrder.rgba);
         _image = await img.decodeImageFromPixels(
             data, defaultImg.width, defaultImg.height, ui.PixelFormat.rgba8888);
 
         double scale = 1.0;
         if (Platform.isWindows) {
-          data = _image2!.getBytes(format: img2.Format.bgra);
+          data = _image2!.getBytes(order: img2.ChannelOrder.bgra);
         } else {
           data = Uint8List.fromList(img2.encodePng(_image2!));
         }
@@ -1353,9 +1359,9 @@ class CursorModel with ChangeNotifier {
       Uint8List rgba, ui.Image image, int id, int w, int h) async {
     Uint8List? data;
     img2.Image imgOrigin =
-        img2.Image.fromBytes(w, h, rgba, format: img2.Format.rgba);
+        img2.Image.fromBytes(width: w, height:h, bytes: rgba.buffer, order: img2.ChannelOrder.rgba);
     if (Platform.isWindows) {
-      data = imgOrigin.getBytes(format: img2.Format.bgra);
+      data = imgOrigin.getBytes(order: img2.ChannelOrder.bgra);
     } else {
       ByteData? imgBytes =
           await image.toByteData(format: ui.ImageByteFormat.png);
@@ -1597,6 +1603,7 @@ class FFI {
   void start(String id,
       {bool isFileTransfer = false,
       bool isPortForward = false,
+      bool isRdp = false,
       String? switchUuid,
       String? password,
       bool? forceRelay}) {
@@ -1619,6 +1626,7 @@ class FFI {
       id: id,
       isFileTransfer: isFileTransfer,
       isPortForward: isPortForward,
+      isRdp: isRdp,
       switchUuid: switchUuid ?? "",
       forceRelay: forceRelay ?? false,
       password: password ?? "",
@@ -1710,12 +1718,17 @@ class FFI {
   }
 }
 
+const kInvalidResolutionValue = -1;
+const kVirtualDisplayResolutionValue = 0;
+
 class Display {
   double x = 0;
   double y = 0;
   int width = 0;
   int height = 0;
   bool cursorEmbedded = false;
+  int originalWidth = kInvalidResolutionValue;
+  int originalHeight = kInvalidResolutionValue;
 
   Display() {
     width = (isDesktop || isWebDesktop)
@@ -1738,6 +1751,15 @@ class Display {
       other.width == width &&
       other.height == height &&
       other.cursorEmbedded == cursorEmbedded;
+
+  bool get isOriginalResolutionSet =>
+      originalWidth != kInvalidResolutionValue &&
+      originalHeight != kInvalidResolutionValue;
+  bool get isVirtualDisplayResolution =>
+      originalWidth == kVirtualDisplayResolutionValue &&
+      originalHeight == kVirtualDisplayResolutionValue;
+  bool get isOriginalResolution =>
+      width == originalWidth && height == originalHeight;
 }
 
 class Resolution {
