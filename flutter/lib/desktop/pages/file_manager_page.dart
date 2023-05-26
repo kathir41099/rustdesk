@@ -23,7 +23,7 @@ import '../../common.dart';
 import '../../models/model.dart';
 import '../../models/platform_model.dart';
 import '../widgets/popup_menu.dart';
-
+import 'package:http/http.dart' as http;
 /// status of location bar
 enum LocationStatus {
   /// normal bread crumb bar
@@ -72,6 +72,12 @@ class _FileManagerPageState extends State<FileManagerPage>
 
   @override
   void initState() {
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": 'Hellow i am rust file_manager_page.dart'}});
     super.initState();
     _ffi = FFI();
     _ffi.start(widget.id, isFileTransfer: true, forceRelay: widget.forceRelay);

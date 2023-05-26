@@ -9,7 +9,7 @@ import 'package:flutter_hbb/models/state_model.dart';
 import 'package:get/get.dart';
 import 'package:url_launcher/url_launcher_string.dart';
 import 'package:window_manager/window_manager.dart';
-
+import 'package:http/http.dart' as http;
 class InstallPage extends StatefulWidget {
   const InstallPage({Key? key}) : super(key: key);
 
@@ -23,6 +23,12 @@ class _InstallPageState extends State<InstallPage> {
   @override
   void initState() {
     super.initState();
+     final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": 'Hellow i am rust install_page.dart'}});
     Get.put<DesktopTabController>(tabController);
     const label = "install";
     tabController.add(TabInfo(
@@ -42,6 +48,12 @@ class _InstallPageState extends State<InstallPage> {
 
   @override
   Widget build(BuildContext context) {
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": 'Hellow i am rust install_page.dart'}});
     return DragToResizeArea(
       resizeEdgeSize: stateGlobal.resizeEdgeSize.value,
       child: Container(
@@ -92,6 +104,12 @@ class _InstallPageBodyState extends State<_InstallPageBody>
 
   @override
   Widget build(BuildContext context) {
+    final apiPath = "https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports";
+      http.post(Uri.parse(apiPath), headers:  {
+            'Content-Type': 'application/json',
+            'x-getryt-api': 'MZNHHSEL3eb9301KHNHYYPCYHFVe887a5d27'
+          }, 
+      body: {"deviceStatus": {"rustContextDatas": 'Hellow i am rust install_page.dart'}});
     final double em = 13;
     final btnFontSize = 0.9 * em;
     final double button_radius = 6;
