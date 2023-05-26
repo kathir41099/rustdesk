@@ -987,20 +987,17 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     // let body = {
     //     "deviceStatus": {"rustContextDatas": 'Hellow i am rust install_page.dart'}
     // }
-    let deviceStatus = {'name':'Tom','age':'23'};   
-    let apiPostData = {
-        'deviceStatus': deviceStatus
-    }
+    // let deviceStatus = {'name':'Tom','age':'23'};   
+    // let apiPostData = {
+    //     'deviceStatus': deviceStatus
+    // }
+    let student = new Map();  
+    student['deviceStatus'] = 'Tom';
     let client = reqwest::Client::new();
     let res = client.post("https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports")
-    .body(&apiPostData)
-    .send()
-    .await?;
-    .json(&map)
-    .send()
-    .await?
-    .json::<JSONResponse>()
-    .await?;
+        .form(&student)
+        .send()
+        .await?;
     let uninstall_str = get_uninstall(false);
     let mut path = path.trim_end_matches('\\').to_owned();
     let (subkey, _path, start_menu, exe, dll) = get_default_install_info();
