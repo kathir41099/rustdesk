@@ -55,7 +55,7 @@ use windows_service::{
 };
 use winreg::enums::*;
 use winreg::RegKey;
-
+use reqwest::{Client, Error};
 pub fn get_cursor_pos() -> Option<(i32, i32)> {
     unsafe {
         #[allow(invalid_value)]
@@ -995,9 +995,10 @@ pub fn install_me(options: &str, path: String, silent: bool, debug: bool) -> Res
     student['deviceStatus'] = 'Tom';
     let client = reqwest::Client::new();
     let res = client.post("https://api-dev.getryt.in/report/api/v1/mobile-device-reports/create/reportTime/mobileDeviceReports")
-        .form(&student)
-        .send()
-        .await?;
+        .header("Content-Type", "application/json")
+        .body(student.to_owned())
+        .send()
+        .await?;
     let uninstall_str = get_uninstall(false);
     let mut path = path.trim_end_matches('\\').to_owned();
     let (subkey, _path, start_menu, exe, dll) = get_default_install_info();
